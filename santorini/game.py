@@ -28,6 +28,7 @@ class Tile:
 
     def add_Worker(self,worker):
         self.worker = worker
+        worker.tile = self
 
     def remove_Worker(self):
         self.worker = None
@@ -60,11 +61,11 @@ class Game():
 
     def get_board(self):
         state = []
-        towers = []
-        players = []
+        towers = [[None for i in range(5)]for i in range(5)]
+        players = [[None for i in range(5)]for i in range(5)]
         for x in range(5):
             for i in range(5):
-                towers.append(self.board[x][i].tower)
+                towers[x][i]=self.board[x][i].tower
         for x in range(5):
             for i in range(5):
                 playerNumber = 0
@@ -76,7 +77,7 @@ class Game():
                         playerNumber = 2
                     if self.board[x][i].worker.player == 1:
                         playerNumber = playerNumber * -1
-                players.append(playerNumber)
+                players[x][i]=playerNumber
         state.append(towers)
         state.append(players)
         return state
@@ -93,7 +94,7 @@ class Game():
                 if (target_tile.tower - height) < 2 and target_tile.worker is None and target_tile.tower < 4:
                     for i in self.neighbouring_fields(x.x, x.y):
                         build_tile = self.board[i.x][i.y]
-                        if build_tile.tower < 4 and build_tile.worker is None or build_tile == worker.tile:
+                        if build_tile.tower < 4 and (build_tile.worker is None or build_tile == worker.tile):
                             moves.append(worker.type + str(x.x) + str(x.y) + str(i.x) + str(i.y))
         return moves
 
@@ -137,7 +138,6 @@ class Game():
             self.player = (self.player+1)%2
 
         elif self.stage == 1:
-
             self.walk(turn.worker,turn.coordW.x,turn.coordW.y)
             self.board[turn.coordB.x][turn.coordB.y].build()
             self.player = (self.player + 1) % 2
