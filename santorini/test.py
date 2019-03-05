@@ -12,11 +12,11 @@ game.move("w1000")
 game.move("w1100")
 
 while True:
-    print(np.matrix(game.get_board()[0]))
-    print(np.matrix(game.get_board()[1]))
-    print(game.allowed_moves())
+    print(np.matrix(game.get_current_state()[0]))
+    print(np.matrix(game.get_current_state()[1]))
+    print( game.get_allowed_moves() )
 
-    if(game.winner is not 0 or not game.allowed_moves()) :
+    if(game.winner is not 0 or not game.get_allowed_moves()) :
         winner = game.player
         if game.winner is not 0:
             winner = game.winner
