@@ -44,6 +44,8 @@ class Tile:
 
 class Game():
     def __init__(self):
+        random.seed() # initialize with system time
+
         self.board = [[None for i in range(5)]for i in range(5)]
         for x in range(5):
             for i in range(5):
@@ -52,6 +54,7 @@ class Game():
         self.player = 0
         self.workers = []
         self.winner = 0
+        self.playedturns = 0
         self.allmoves = []
         workertypes = ['m', 'w']
         for t in workertypes:
@@ -59,7 +62,7 @@ class Game():
                 for j in range(25):
                     self.allmoves.append(t+str((i%5))+str((i//5))+str((j%5))+str((j//5)))
 
-    def get_board(self):
+    def get_current_state(self):
         state = []
         towers = [[None for i in range(5)]for i in range(5)]
         players = [[None for i in range(5)]for i in range(5)]
@@ -82,7 +85,26 @@ class Game():
         state.append(players)
         return state
 
-    def allowed_moves(self):
+    def set_up_randomly(self):
+        assert self.stage == 0 and self.workers.__len__() < 4
+
+        spaces_texts = []
+        for x in range( 5 ):
+            for y in range( 5 ):
+                spaces_texts.append( str(x) + str(y) )
+
+        picked_spaces = random.sample( spaces_texts, 4 - self.workers.__len__() )
+        player_index = self.workers.__len__()
+        for picked in picked_spaces:
+            placement = "m" if player_index < 2 else "w"
+            placement += picked
+            placement += "00"
+            print( "Random placement: " + placement )
+            self.move(placement)
+            player_index += 1
+
+
+    def get_allowed_moves( self ):
         moves = []
         player_workers = []
         player_workers.append(self.get_worker('m',self.player))
@@ -96,6 +118,7 @@ class Game():
                         build_tile = self.board[i.x][i.y]
                         if build_tile.tower < 4 and (build_tile.worker is None or build_tile == worker.tile):
                             moves.append(worker.type + str(x.x) + str(x.y) + str(i.x) + str(i.y))
+        if moves.__len__() == 0: self.winner = (self.player + 1)%2
         return moves
 
     def neighbouring_fields(self,x,y):
@@ -106,13 +129,13 @@ class Game():
                 fields.append(Coord(x-1, y-1))
         if y > 0:
             fields.append(Coord(x, y-1))
-        if x < 5:
+        if x < 4:
             fields.append(Coord(x+1, y))
             if y > 0:
                 fields.append(Coord(x+1, y-1))
-            if y < 5:
+            if y < 4:
                 fields.append(Coord(x+1, y+1))
-        if y < 5:
+        if y < 4:
             fields.append(Coord(x, y+1))
             if x > 0:
                 fields.append(Coord(x-1, y+1))
@@ -140,7 +163,9 @@ class Game():
         elif self.stage == 1:
             self.walk(turn.worker,turn.coordW.x,turn.coordW.y)
             self.board[turn.coordB.x][turn.coordB.y].build()
+            if self.player == 1: self.playedturns += 1
             self.player = (self.player + 1) % 2
+
 
     def walk(self,worker_type,xPos,yPos):
         worker = self.get_worker(worker_type,self.player)
@@ -149,7 +174,7 @@ class Game():
         worker.coord.x = xPos
         worker.coord.y = yPos
         if self.board[xPos][yPos].tower == 3:
-            self.winner = self.player
+            self.winner = self.player + 1
 
     def build(self,x,y):
         self.board[x][y].build()
