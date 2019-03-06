@@ -118,7 +118,7 @@ class Game():
                         build_tile = self.board[i.x][i.y]
                         if build_tile.tower < 4 and (build_tile.worker is None or build_tile == worker.tile):
                             moves.append(worker.type + str(x.x) + str(x.y) + str(i.x) + str(i.y))
-        if moves.__len__() == 0: self.winner = (self.player + 1)%2
+        if moves.__len__() == 0: self.winner = (self.player + 1)%2 + 1
         return moves
 
     def neighbouring_fields(self,x,y):
