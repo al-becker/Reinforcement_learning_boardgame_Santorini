@@ -1,9 +1,13 @@
 import random as random
+from typing import List
 
 class Coord:
 	def __init__(self,x,y):
 		self.x = x
 		self.y = y
+
+	def __str__( self ):
+		return "(" + chr(ord('a')+self.x) + "|" + str(self.y+1) + ")"
 
 class Turn:
 	def __init__(self,turn_string):
@@ -40,20 +44,41 @@ class Tile:
 			else:
 				raise ValueError('tried to build on worker tile')
 		else:
-			raise ValueError('wrong position for worker')
+			raise ValueError('can\'t build on complete tower')
 
-class Game():
+class Move:
+	# Set start and build to None to describe an initial worker placement move
+	def __init__( self, start, to, build ):
+		"""
+
+		:type start: Coord or None
+		:type to: Coord
+		:type build: Coord or None
+		"""
+		self.start = start
+		self.to = to
+		self.build = build
+
+	def __str__( self ):
+		if self.start is None:
+			return "Move from " + str(self.start) + " to " + str(self.to) + ", building at " + str(self.build) + "."
+		else:
+			return "Placing worker at " + str(self.to) + "."
+
+class Game:
+	board: List[ List[ Tile ] ]
+
 	def __init__(self):
 		random.seed() # initialize with system time
 
 		self.board = [[None for i in range(5)]for i in range(5)]
 		for x in range(5):
-			for i in range(5):
-				self.board[x][i] = Tile()
+			for y in range(5):
+				self.board[x][y] = Tile()
 		self.stage = 0
-		self.player = 0
+		self.active_player = 0
 		self.workers = []
-		self.winner = 0
+		self.winner = None
 		self.playedturns = 0
 		self.allmoves = []
 		workertypes = ['m', 'w']
@@ -62,53 +87,52 @@ class Game():
 				for j in range(25):
 					self.allmoves.append(t+str((i%5))+str((i//5))+str((j%5))+str((j//5)))
 
+	def get_tile( self, coordinates: Coord ) -> Tile:
+		return self.board[ coordinates.x ][ coordinates.y ]
+
 	def get_current_state(self):
 		state = []
 		towers = [[None for i in range(5)]for i in range(5)]
-		players = [[None for i in range(5)]for i in range(5)]
+		workers = [[None for i in range(5)]for i in range(5)]
 		for x in range(5):
-			for i in range(5):
-				towers[x][i]=self.board[x][i].tower
+			for y in range(5):
+				towers[x][y]=self.board[x][y].tower
 		for x in range(5):
-			for i in range(5):
-				playerNumber = 0
-				if self.board[x][i].worker is not None:
+			for y in range(5):
+				worker_number = 0
+				if self.board[x][y].worker is not None:
 
-					if self.board[x][i].worker.type == 'm':
-						playerNumber = 1
+					if self.board[x][y].worker.type == 'm':
+						worker_number = 1
 					else:
-						playerNumber = 2
-					if self.board[x][i].worker.player == 1:
-						playerNumber = playerNumber * -1
-				players[x][i]=playerNumber
+						worker_number = 2
+					if self.board[x][y].worker.player == 1:
+						worker_number = worker_number * -1
+				workers[x][y]=worker_number
 		state.append(towers)
-		state.append(players)
+		state.append(workers)
 		return state
 
 	def set_up_randomly(self):
-		assert self.stage == 0 and self.workers.__len__() < 4
+		current_worker_count = len(self.workers)
+		assert self.stage == 0 and  current_worker_count < 4
 
-		spaces_texts = []
+		possible_placements = []
 		for x in range( 5 ):
 			for y in range( 5 ):
-				spaces_texts.append( str(x) + str(y) )
+				possible_placements.append( Move( None, Coord( x, y), None ) )
 
-		picked_spaces = random.sample( spaces_texts, 4 - self.workers.__len__() )
-		player_index = self.workers.__len__()
-		for picked in picked_spaces:
-			placement = "m" if player_index < 2 else "w"
-			placement += picked
-			placement += "00"
-			print( "Random placement: " + placement )
-			self.move(placement)
-			player_index += 1
+		picked_placements = random.sample( possible_placements, 4 - current_worker_count )
+		for picked in picked_placements:
+			print( str(picked) )
+			self.move(picked)
 
 
 	def get_allowed_moves( self ):
 		moves = []
 		player_workers = []
-		player_workers.append(self.get_worker('m',self.player))
-		player_workers.append(self.get_worker('w',self.player))
+		player_workers.append( self.get_worker('m', self.active_player ) )
+		player_workers.append( self.get_worker('w', self.active_player ) )
 		for worker in player_workers:
 			height = worker.tile.tower
 			for x in self.neighbouring_fields(worker.coord.x,worker.coord.y):
@@ -118,7 +142,7 @@ class Game():
 						build_tile = self.board[i.x][i.y]
 						if build_tile.tower < 4 and (build_tile.worker is None or build_tile == worker.tile):
 							moves.append(worker.type + str(x.x) + str(x.y) + str(i.x) + str(i.y))
-		if moves.__len__() == 0: self.winner = (self.player + 1)%2 + 1
+		if len(moves) == 0: self.winner = (self.active_player + 1) % 2
 		return moves
 
 	def neighbouring_fields(self,x,y):
@@ -150,31 +174,43 @@ class Game():
 			raise ValueError('Worker not found')
 		return worker
 
-	def move(self,input):
-		turn = Turn(input)
+	def get_worker( self, coordinates ):
+		return self.get_tile( coordinates ).worker
+
+	def move(self, move):
 		if self.stage == 0:
-			worker = Worker(turn.worker,self.board[turn.coordW.x][turn.coordW.y],self.player, Coord(turn.coordW.x,turn.coordW.y))
-			self.workers.append(worker)
-			if self.workers.__len__()>=4:
+			assert move.start is None and move.build is None
+
+			placed_worker = Worker("m", self.get_tile( move.to ), self.active_player, move.to )
+			self.workers.append( placed_worker )
+
+			if len(self.workers) >= 4:
 				self.stage = 1
 				print("Entering Stage 1")
-			self.player = (self.player+1)%2
+			self.switch_active_player()
 
 		elif self.stage == 1:
-			self.walk(turn.worker,turn.coordW.x,turn.coordW.y)
-			self.board[turn.coordB.x][turn.coordB.y].build()
-			if self.player == 1: self.playedturns += 1
-			self.player = (self.player + 1) % 2
+			self.walk( move.start, move.to )
+			self.get_tile( move.build ).build()
+			if self.active_player == 1: self.playedturns += 1
+			self.switch_active_player()
 
+	def switch_active_player( self ):
+		self.active_player = (self.active_player + 1) % 2
 
-	def walk(self,worker_type,xPos,yPos):
-		worker = self.get_worker(worker_type,self.player)
-		worker.tile.remove_Worker()
-		self.board[xPos][yPos].add_Worker(worker)
-		worker.coord.x = xPos
-		worker.coord.y = yPos
-		if self.board[xPos][yPos].tower == 3:
-			self.winner = self.player + 1
+	def walk(self, start, to ):
+		worker = self.get_worker( start )
+		start_tile = self.get_tile( start )
+		to_tile = self.get_tile( to )
+		start_tile.remove_Worker()
+		to_tile.add_Worker(worker)
+		worker.coord = to
+		if start_tile.tower == 2 and to_tile.tower == 3:
+			self.winner = self.active_player
 
 	def build(self,x,y):
 		self.board[x][y].build()
+
+	def move( self, start, to, build ):
+		constructed_move = Move( start, to, build )
+		self.move( constructed_move )
