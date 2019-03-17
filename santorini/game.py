@@ -52,7 +52,7 @@ class Move:
 		self.build = build
 
 	def __str__( self ):
-		if self.start is None:
+		if self.start is not None:
 			return "Move from " + str(self.start) + " to " + str(self.to) + ", building at " + str(self.build) + "."
 		else:
 			return "Placing worker at " + str(self.to) + "."
@@ -94,12 +94,13 @@ class Game:
 		for x in range(5):
 			for y in range(5):
 				worker_number = 0
-				if self.board[x][y].worker is not None:
-					if self.board[x][y].worker.type == 'm':
+				local_worker = self.get_tile( Coord( x, y ) ).worker
+				if local_worker is not None:
+					if local_worker.gender == 'm':
 						worker_number = 1
 					else:
 						worker_number = 2
-					if self.board[x][y].worker.player == 1:
+					if local_worker.owner == 1:
 						worker_number = worker_number * -1
 				workers[x][y]=worker_number
 		state.append(towers)
@@ -117,7 +118,7 @@ class Game:
 
 		picked_placements = random.sample( possible_placements, 4 - current_worker_count )
 		for picked in picked_placements:
-			print( str(picked) )
+			print( "Plancement move: " + str(picked) )
 			self.move(picked)
 
 	def get_allowed_moves( self ):
@@ -139,14 +140,14 @@ class Game:
 	def initialize_neighbours( self ):
 		for tile_column in self.board:
 			for current_tile in tile_column:
-				print( "Neighbours for " + str(current_tile.coord) )
+				# print( "Neighbours for " + str(current_tile.coord) )
 				for neighbour_column in self.board:
 					for neighbour_candidate in neighbour_column:
 						dx = abs( current_tile.coord.x - neighbour_candidate.coord.x )
 						dy = abs( current_tile.coord.y - neighbour_candidate.coord.y )
 						if dx <= 1 and dy <= 1 and not (dx==0 and dy == 0):
 							current_tile.neighbours.append( neighbour_candidate )
-							print( "--- added " + str( neighbour_candidate.coord ) )
+							# print( "--- added " + str( neighbour_candidate.coord ) )
 							assert len( current_tile.neighbours ) < 9
 
 	def move(self, move):
@@ -156,6 +157,9 @@ class Game:
 			worker_type = "m" if len( self.workers ) % 2 == 0 else "w"
 			placed_worker = Worker( worker_type, self.active_player )
 			self.workers.append( placed_worker )
+
+			assert self.get_tile( move.to ).worker is None
+			self.get_tile( move.to ).worker = placed_worker
 
 			if self.active_player == 0 and len( self.workers ) >= 2:
 				self.switch_active_player()
