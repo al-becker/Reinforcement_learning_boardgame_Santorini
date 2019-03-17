@@ -1,5 +1,5 @@
 import random as random
-from typing import List
+from typing import List, Any
 
 class Coord:
 	def __init__(self,x,y):
@@ -18,24 +18,16 @@ class Turn:
 		self.coordB = Coord(int(turn_string[3]),int(turn_string[4]))
 
 class Worker:
-	def __init__(self,type,tile,player,coord):
-		self.type = type
-		self.tile = tile
-		self.tile.add_Worker(self)
-		self.player = player
-		self.coord = coord
+	def __init__( self, gender, owner ):
+		self.gender = gender
+		self.owner = owner
 
 class Tile:
-	def __init__(self):
+	def __init__(self, coord):
 		self.tower = 0
 		self.worker = None
-
-	def add_Worker(self,worker):
-		self.worker = worker
-		worker.tile = self
-
-	def remove_Worker(self):
-		self.worker = None
+		self.coord = coord
+		self.neighbours = []
 
 	def build(self):
 		if self.tower<4:
@@ -74,18 +66,20 @@ class Game:
 		self.board = [[None for i in range(5)]for i in range(5)]
 		for x in range(5):
 			for y in range(5):
-				self.board[x][y] = Tile()
+				self.board[x][y] = Tile( Coord( x, y ) )
+		self.initialize_neighbours()
 		self.stage = 0
 		self.active_player = 0
 		self.workers = []
 		self.winner = None
 		self.playedturns = 0
+
 		self.allmoves = []
-		workertypes = ['m', 'w']
-		for t in workertypes:
-			for i in range(25):
-				for j in range(25):
-					self.allmoves.append(t+str((i%5))+str((i//5))+str((j%5))+str((j//5)))
+		for tile_column in self.board:
+			for current_tile in tile_column:
+				for move_tile in current_tile.neighbours:
+					for build_tile in move_tile.neighbours:
+						self.allmoves.append( Move( current_tile.coord, move_tile.coord, build_tile.coord ) )
 
 	def get_tile( self, coordinates: Coord ) -> Tile:
 		return self.board[ coordinates.x ][ coordinates.y ]
@@ -101,7 +95,6 @@ class Game:
 			for y in range(5):
 				worker_number = 0
 				if self.board[x][y].worker is not None:
-
 					if self.board[x][y].worker.type == 'm':
 						worker_number = 1
 					else:
@@ -127,90 +120,78 @@ class Game:
 			print( str(picked) )
 			self.move(picked)
 
-
 	def get_allowed_moves( self ):
 		moves = []
-		player_workers = []
-		player_workers.append( self.get_worker('m', self.active_player ) )
-		player_workers.append( self.get_worker('w', self.active_player ) )
-		for worker in player_workers:
-			height = worker.tile.tower
-			for x in self.neighbouring_fields(worker.coord.x,worker.coord.y):
-				target_tile = self.board[x.x][x.y]
-				if (target_tile.tower - height) < 2 and target_tile.worker is None and target_tile.tower < 4:
-					for i in self.neighbouring_fields(x.x, x.y):
-						build_tile = self.board[i.x][i.y]
-						if build_tile.tower < 4 and (build_tile.worker is None or build_tile == worker.tile):
-							moves.append(worker.type + str(x.x) + str(x.y) + str(i.x) + str(i.y))
-		if len(moves) == 0: self.winner = (self.active_player + 1) % 2
+		for tile_column in self.board:
+			for current_tile in tile_column:
+				if current_tile.worker is not None:
+					for move_tile in current_tile.neighbours:
+						if move_tile.tower < 4 and move_tile.worker is None and move_tile.tower <= current_tile.tower + 1:
+							for build_tile in move_tile.neighbours:
+								if build_tile.tower < 4 and( build_tile.worker is None or build_tile == current_tile ):
+									moves.append( Move( current_tile.coord, move_tile.coord, build_tile.coord ) )
+
+		if len(moves) == 0:
+			self.winner = (self.active_player + 1) % 2
+			self.stage = 2
 		return moves
 
-	def neighbouring_fields(self,x,y):
-		fields = []
-		if x > 0:
-			fields.append(Coord(x-1, y))
-			if y > 0:
-				fields.append(Coord(x-1, y-1))
-		if y > 0:
-			fields.append(Coord(x, y-1))
-		if x < 4:
-			fields.append(Coord(x+1, y))
-			if y > 0:
-				fields.append(Coord(x+1, y-1))
-			if y < 4:
-				fields.append(Coord(x+1, y+1))
-		if y < 4:
-			fields.append(Coord(x, y+1))
-			if x > 0:
-				fields.append(Coord(x-1, y+1))
-		return fields
-
-	def get_worker(self,type,player):
-		worker = None
-		for x in self.workers:
-			if x.type == type and x.player == player:
-				worker = x
-		if worker is None:
-			raise ValueError('Worker not found')
-		return worker
-
-	def get_worker( self, coordinates ):
-		return self.get_tile( coordinates ).worker
+	def initialize_neighbours( self ):
+		for tile_column in self.board:
+			for current_tile in tile_column:
+				print( "Neighbours for " + str(current_tile.coord) )
+				for neighbour_column in self.board:
+					for neighbour_candidate in neighbour_column:
+						dx = abs( current_tile.coord.x - neighbour_candidate.coord.x )
+						dy = abs( current_tile.coord.y - neighbour_candidate.coord.y )
+						if dx <= 1 and dy <= 1 and not (dx==0 and dy == 0):
+							current_tile.neighbours.append( neighbour_candidate )
+							print( "--- added " + str( neighbour_candidate.coord ) )
+							assert len( current_tile.neighbours ) < 9
 
 	def move(self, move):
 		if self.stage == 0:
 			assert move.start is None and move.build is None
 
-			placed_worker = Worker("m", self.get_tile( move.to ), self.active_player, move.to )
+			worker_type = "m" if len( self.workers ) % 2 == 0 else "w"
+			placed_worker = Worker( worker_type, self.active_player )
 			self.workers.append( placed_worker )
+
+			if self.active_player == 0 and len( self.workers ) >= 2:
+				self.switch_active_player()
 
 			if len(self.workers) >= 4:
 				self.stage = 1
 				print("Entering Stage 1")
-			self.switch_active_player()
+				self.switch_active_player()
 
 		elif self.stage == 1:
 			self.walk( move.start, move.to )
-			self.get_tile( move.build ).build()
+			self.build( move.build )
 			if self.active_player == 1: self.playedturns += 1
 			self.switch_active_player()
 
-	def switch_active_player( self ):
-		self.active_player = (self.active_player + 1) % 2
+		else:
+			raise NameError("Can't make moves when the game is over")
 
-	def walk(self, start, to ):
-		worker = self.get_worker( start )
-		start_tile = self.get_tile( start )
-		to_tile = self.get_tile( to )
-		start_tile.remove_Worker()
-		to_tile.add_Worker(worker)
-		worker.coord = to
-		if start_tile.tower == 2 and to_tile.tower == 3:
-			self.winner = self.active_player
-
-	def build(self,x,y):
-		self.board[x][y].build()
-
-	def move( self, start, to, build ):
+	def move_coords( self, start, to, build ):
 		constructed_move = Move( start, to, build )
 		self.move( constructed_move )
+
+	def walk(self, start, to ):
+		start_tile = self.get_tile( start )
+		to_tile = self.get_tile( to )
+		assert start_tile.worker is not None
+
+		to_tile.worker = start_tile.worker
+		start_tile.worker = None
+
+		if start_tile.tower == 2 and to_tile.tower == 3:
+			self.winner = self.active_player
+			self.stage = 2
+
+	def build(self, coord):
+		self.get_tile( coord ).build()
+
+	def switch_active_player( self ):
+		self.active_player = (self.active_player + 1) % 2
