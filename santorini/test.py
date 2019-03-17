@@ -16,11 +16,11 @@ while True:
     print(np.matrix(game.get_current_state()[1]))
     print( game.get_allowed_moves() )
 
-    if(game.winner is not 0 or not game.get_allowed_moves()) :
-        winner = game.player
-        if game.winner is not 0:
+    if game.winner is not None or not game.get_allowed_moves():
+        winner = game.active_player
+        if game.winner is not None:
             winner = game.winner
         print("We have a winner Player " + str(winner))
 
-    x = input("Player " + str(game.player+1) + " ")
+    x = input("Player " + str( game.active_player + 1 ) + " " )
     game.move(x)
