@@ -122,6 +122,9 @@ class Game:
 			self.move(picked)
 
 	def get_allowed_moves( self ):
+		#TODO: set this up for stage 0
+		assert self.stage == 1 or self.stage == 2
+
 		moves = []
 		for tile_column in self.board:
 			for current_tile in tile_column:
