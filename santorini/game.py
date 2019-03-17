@@ -1,9 +1,11 @@
 import random as random
-from typing import List, Any
+from typing import List
 
 class Coord:
 	def __init__(self,x,y):
+		assert x < 5
 		self.x = x
+		assert y < 5
 		self.y = y
 
 	def __str__( self ):
@@ -56,6 +58,25 @@ class Move:
 			return "Move from " + str(self.start) + " to " + str(self.to) + ", building at " + str(self.build) + "."
 		else:
 			return "Placing worker at " + str(self.to) + "."
+
+	def serialize( self ):
+		return( (str( self.start.x ) if self.start is not None else "9") +
+				(str( self.start.y ) if self.start is not None else "9") +
+				str( self.to.x ) +
+				str( self.to.y ) +
+				(str( self.build.x ) if self.build is not None else "9") +
+				(str( self.build.y ) if self.build is not None else "9") )
+
+	def deserialize( self, data: str ):
+		assert len(data) == 6
+
+		if data[0] == 9: self.start = None
+		else: self.start = Coord( int(data[0]), int(data[1]) )
+
+		self.to = Coord( int(data[2]), int(data[3]) )
+
+		if data[4] == 9: self.build = None
+		else: self.build = Coord( int(data[4]), int(data[5]) )
 
 class Game:
 	board: List[ List[ Tile ] ]
@@ -121,6 +142,8 @@ class Game:
 			print( "Plancement move: " + str(picked) )
 			self.move(picked)
 
+		return picked_placements
+
 	def get_allowed_moves( self ):
 		#TODO: set this up for stage 0
 		assert self.stage == 1 or self.stage == 2
@@ -128,7 +151,7 @@ class Game:
 		moves = []
 		for tile_column in self.board:
 			for current_tile in tile_column:
-				if current_tile.worker is not None:
+				if current_tile.worker is not None and current_tile.worker.owner == self.active_player:
 					for move_tile in current_tile.neighbours:
 						if move_tile.tower < 4 and move_tile.worker is None and move_tile.tower <= current_tile.tower + 1:
 							for build_tile in move_tile.neighbours:
