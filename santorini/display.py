@@ -1,4 +1,6 @@
 from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -16,6 +18,7 @@ def shutdownDisplay():
 
 
 def showGameState(gameState, playerTurn, gameStage, playedTurns, gameBoardGraphics=None):
+
     if not gameBoardGraphics:
         print()
         print("After Turn " + str(playedTurns))

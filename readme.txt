@@ -1,3 +1,1 @@
-text
-
-Warum ist hier so wenig drin?
+Experimenting with an AI for the BoardGame Santorini
